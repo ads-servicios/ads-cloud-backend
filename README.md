@@ -61,6 +61,59 @@ pip install -r requirements.txt -r requirements-dev.txt
 pytest -q
 ```
 
+## Auth (AS-52 / AS-53)
+
+JWT Bearer authentication. Public routes: `GET /health`, `POST /contact`.  
+Protected: `GET /auth/me`, `/users` CRUD, `/roles` CRUD. Login: `POST /auth/login`.
+
+Authorization is **role → scope → action** (DB). Seeded matrix:
+
+| role | scope | actions |
+|------|-------|---------|
+| administrator | users | read, list, create, edit, delete |
+| common | users | read |
+| administrator | roles | read, list, create, edit, delete |
+
+### First admin (migration seed)
+
+Alembic `0003` creates (idempotent) administrator:
+
+- email: `ads.serviciosintegrales@gmail.com`
+- password: `admin123456`
+- `must_change_password=true`
+
+After first login, call `POST /auth/force-change-password` with `{ "new_password": "..." }` (Bearer). New users created via API also start with `must_change_password=true`.
+
+| Variable | Purpose |
+|----------|---------|
+| `JWT_SECRET` | HMAC secret (required outside development) |
+| `JWT_ALGORITHM` | Default `HS256` |
+| `JWT_EXPIRE_MINUTES` | Access token TTL (default 60) |
+| `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` | Optional fallback if DB has no users |
+
+```bash
+# Login
+curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"ads.serviciosintegrales@gmail.com","password":"admin123456"}'
+
+# Forced password change (when must_change_password is true)
+curl -s -X POST http://localhost:8000/auth/force-change-password \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"new_password":"your-strong-password"}'
+
+# List users (needs users:list)
+curl -s http://localhost:8000/users \
+  -H "Authorization: Bearer <access_token>"
+
+# Manage roles (needs roles:* — administrator)
+curl -s http://localhost:8000/roles \
+  -H "Authorization: Bearer <access_token>"
+```
+
+In Swagger (`/docs`), use **Authorize** with the Bearer token from login.
+
 ## SMTP (contact form)
 
 Secrets are **never committed**. SES SMTP from `contacto@ads-inversiones.es`.
