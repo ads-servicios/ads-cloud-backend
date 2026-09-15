@@ -3,3 +3,4 @@ pytest-asyncio
 httpx
 email-validator
 aiosqlite
+pip-audit>=2.7.0
